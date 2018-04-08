@@ -12,4 +12,4 @@ echo "Dumping fasta files, this will take a while..."
 
 fastq-dump -v -B -W --fasta --split-files --skip-technical --read-filter pass -O $file_dir $acc_num 
 
-echo "done..."
+echo "...done"
