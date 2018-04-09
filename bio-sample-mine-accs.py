@@ -6,8 +6,18 @@ from Bio import Entrez
 from time import sleep
 import subprocess
 import tarfile
-from optparse import OptionParser
-import pprint
+import argparse
+parser = argparse.ArgumentParser(description="primary filtering of biosample data")
+parser.add_argument('--preserve', dest="pre", choices=['yes', 'no'],
+                    default='yes', help="archive and preserve raw id files OR archive and delete")
+args = parser.parse_args()
+
+if args.pre == 'no':
+    prs_og = False
+else:
+    prs_og = True
+
+
 # simplify calling of Entrez.post, for use with batch calling of 1000 ids later in script
 # returns a tuple of webenv and query_key
 def post_to_ncbi(ids, database, history):
@@ -47,7 +57,9 @@ def perf_large_elink(fromdb_id_list):
     fail_ctr = 0
     success_ctr = 0
     sra_ids_final = []
+    # split list into chunks of 1k ids
     chunked_list = split_list(fromdb_id_list, 1000)
+    # attempt to elink each chunk, if fails once, retries once and only once
     for chunk in chunked_list:
         print "Retrieving chunk..."
         try:
@@ -69,7 +81,8 @@ def perf_large_elink(fromdb_id_list):
 
 
 # archives ids for future use and version ctl
-def archive_data(biosamp_data, sra_data, dir, del_og):
+def archive_data(biosamp_data, sra_data, dir, prs_og):
+    # get current datetime in ISO format
     curr_time = datetime.datetime.now().isoformat()
     os.chdir("./id_archives")
     bio_samp_arch_fn = "biosamp-ids-" + curr_time + ".txt"
@@ -77,27 +90,30 @@ def archive_data(biosamp_data, sra_data, dir, del_og):
     print bio_samp_arch_fn
     print sra_id_arch_fn
 
+    # write text file of biosample ids
     with open(bio_samp_arch_fn, "wb") as ba:
         for id in biosamp_data:
             ba.write(id)
             ba.write("\n")
     ba.close()
 
+    # write text file of sra ids
     with open(sra_id_arch_fn, "wb") as sa:
         for id in sra_data:
             sa.write(id)
             sa.write("\n")
     sa.close()
 
-    tar_fn = "data-archive-" + curr_time + ".tar.gz"
-    # tar interpets : in a strange and undesirable manner 
+    # create a tar archive of the data and if del_og == true, delete non-archived files
+    tar_fn ="Homo-sapiens-data-archive-" + curr_time + ".tar.gz"
+    # tar interpets : in a strange and undesirable manner
     tar_fn = tar_fn.replace(":", "-")
     cmd = "tar -czf " + tar_fn + " *.txt"
     tarchive = tarfile.open(tar_fn, 'w:gz')
     for file in os.listdir(os.getcwd()):
         if file.endswith(".txt"):
             tarchive.add(file)
-            if del_og:
+            if not prs_og:
                 os.remove(file)
     tarchive.close()
 
@@ -123,6 +139,7 @@ sra_ids = [val for sublist in sra_ids for val in sublist]
 # Generate an archive of the data
 if not os.path.isdir("id_archives"):
     os.mkdir("id_archives")
-    archive_data(biosamp_ids, sra_ids, "id_archives", del_og=True)
+    archive_data(biosamp_ids, sra_ids, "id_archives", prs_og=prs_og)
 else:
-    archive_data(biosamp_ids, sra_ids, "id_archives", del_og=True)
+    archive_data(biosamp_ids, sra_ids, "id_archives", prs_og=prs_og)
+
