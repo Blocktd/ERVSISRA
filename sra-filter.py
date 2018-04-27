@@ -1,12 +1,8 @@
 #!/usr/bin python
-import sys
 import os.path
 import datetime
 from Bio import Entrez
-from time import sleep
-import subprocess
 import argparse
-import tarfile
 
 parser = argparse.ArgumentParser(description="primary filtering of biosample data")
 parser.add_argument('-sp', dest='sp', help="query species", required=True)
@@ -85,10 +81,12 @@ print "numbers using filter: %s" % esearch_term
 
 # write filtered accession numbers to a file
 print "\nWriting file of filtered acc..."
-os.chdir("../")
+os.chdir('..')
 with open(filtered_fn, 'wb') as ofn:
     for acc in filtered_ids:
         ofn.write(acc)
         ofn.write("\n")
 ofn.close()
 print "...done"
+
+exit(0)

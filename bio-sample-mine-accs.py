@@ -1,6 +1,6 @@
 #!/usr/bin python
-import sys
-import os.path
+
+import os
 import datetime
 from Bio import Entrez
 from time import sleep
@@ -9,7 +9,8 @@ import tarfile
 import argparse
 parser = argparse.ArgumentParser(description="primary filtering of biosample data")
 parser.add_argument('--preserve', dest="pre", choices=['yes', 'no'],
-                    default='yes', help="archive and preserve raw id files OR archive and delete")
+                    default='yes', help="archive and preserve raw id files OR archive and delete", required=True)
+parser.add_argument('--species', dest="spe", required=True)
 args = parser.parse_args()
 
 if args.pre == 'no':
@@ -74,14 +75,14 @@ def perf_large_elink(fromdb_id_list):
             except:
                 print "download unrecoverable. Will continue, data will be incomplete"
                 fail_ctr += 1
-        sleep(1)
+        sleep(.5)
         print "...done"
     print "successfully retrieved %d chunks, failed to retrieve %d chunks" % (success_ctr, fail_ctr)
     return sra_ids_final
 
 
 # archives ids for future use and version ctl
-def archive_data(biosamp_data, sra_data, dir, prs_og):
+def archive_data(biosamp_data, sra_data, dir, prs_og, species):
     # get current datetime in ISO format
     curr_time = datetime.datetime.now().isoformat()
     os.chdir("./id_archives")
@@ -105,10 +106,9 @@ def archive_data(biosamp_data, sra_data, dir, prs_og):
     sa.close()
 
     # create a tar archive of the data and if del_og == true, delete non-archived files
-    tar_fn ="Homo-sapiens-data-archive-" + curr_time + ".tar.gz"
+    tar_fn = species +"-data-archive-" + curr_time + ".tar.gz"
     # tar interpets : in a strange and undesirable manner
     tar_fn = tar_fn.replace(":", "-")
-    cmd = "tar -czf " + tar_fn + " *.txt"
     tarchive = tarfile.open(tar_fn, 'w:gz')
     for file in os.listdir(os.getcwd()):
         if file.endswith(".txt"):
@@ -118,7 +118,7 @@ def archive_data(biosamp_data, sra_data, dir, prs_og):
     tarchive.close()
 
 
-species = "homo sapiens"
+species = args.spe
 
 # esearch entrez util for:
 # find specified organisms with disease attribute, public, sra linked, from human
@@ -139,7 +139,18 @@ sra_ids = [val for sublist in sra_ids for val in sublist]
 # Generate an archive of the data
 if not os.path.isdir("id_archives"):
     os.mkdir("id_archives")
-    archive_data(biosamp_ids, sra_ids, "id_archives", prs_og=prs_og)
+    archive_data(biosamp_ids, sra_ids, "id_archives", prs_og=prs_og, species=species)
 else:
-    archive_data(biosamp_ids, sra_ids, "id_archives", prs_og=prs_og)
+    archive_data(biosamp_ids, sra_ids, "id_archives", prs_og=prs_og, species=species)
 
+# call the filtering script
+print "filtering for SRA Ids..."
+args = ["python", "sra-filter.py " + "--species " + "\"" + species + "\"" + "--preserve "  + args.pre]
+print args
+filt_proc = subprocess.Popen(args)
+stdout = filt_proc.communicate()
+print stdout
+exit_code = filt_proc.wait()
+# check exit code for successful completion
+
+print "...done filtering."
